@@ -1691,7 +1691,12 @@ img {
 .paper-viewer-rule span { animation: paper-line-in 900ms cubic-bezier(.22,1,.36,1) both; background: var(--blue); display: block; height: 1px; width: 24%; }
 .paper-reader { align-items: start; display: grid; gap: 2vw; grid-template-columns: minmax(90px,.13fr) minmax(0,.74fr) minmax(90px,.13fr); }
 .paper-frame-wrap { background: #e8e8e5; box-shadow: 0 18px 54px rgba(12,18,40,.12); height: calc(100svh - 18vh); min-height: 620px; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-.paper-frame-wrap iframe { border: 0; height: 100%; width: 100%; }
+.paper-pages { display: flex; flex-direction: column; gap: 18px; min-height: 100%; min-width: 100%; padding: 16px; width: max-content; }
+.paper-page { background: white; box-shadow: 0 4px 18px rgba(12,18,40,.12); flex: none; margin: 0 auto; position: relative; width: max-content; }
+.paper-page canvas { display: block; max-width: none; }
+.paper-page figcaption { background: var(--blue); bottom: 0; color: white; font-family: var(--mono); font-size: 8px; letter-spacing: .1em; padding: 5px 7px; position: absolute; right: 0; }
+.paper-loading { color: var(--blue); font-family: var(--mono); font-size: 10px; letter-spacing: .12em; margin: 25vh auto; text-align: center; }
+.paper-loading.is-error { color: #8f2525; line-height: 1.8; }
 .paper-reader-note { color: var(--blue); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; position: sticky; top: 4vh; }
 .paper-reader-note > span { font-size: clamp(48px,6vw,90px); font-weight: 300; letter-spacing: -.08em; line-height: 1; opacity: .18; }
 .paper-reader-note p { line-height: 1.7; }
@@ -1710,7 +1715,7 @@ img {
   .paper-reader { display: block; }
   .paper-reader-note { display: none; }
   .paper-frame-wrap { height: 74svh; min-height: 520px; overflow-y: auto; touch-action: pan-y pinch-zoom; width: 100%; -webkit-overflow-scrolling: touch; }
-  .paper-frame-wrap iframe { min-height: 74svh; touch-action: pan-y pinch-zoom; }
+  .paper-pages { gap: 12px; padding: 10px; }
   .paper-zoom { flex-direction: row; justify-content: center; margin-top: 16px; position: static; }
   .paper-zoom a { border-left: 1px solid var(--hairline); border-top: 0; margin: 0 0 0 8px; padding: 0 0 0 16px; }
 }
