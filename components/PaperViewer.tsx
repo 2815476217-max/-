@@ -20,7 +20,14 @@ export function PaperViewer({ paper }: PaperViewerProps) {
     <div className="paper-viewer-rule" aria-hidden="true"><span /></div>
     <section className="paper-reader" aria-label={`论文 ${paper.number} PDF 阅读器`}>
       <aside className="paper-reader-note"><span>{paper.number}</span><p>上下滚动阅读<br />SCROLL TO READ</p></aside>
-      <div className="paper-frame-wrap"><iframe key={zoom} src={pdfSource} title={`论文 ${paper.number} 完整 PDF`} /></div>
+      <div
+        className="paper-frame-wrap"
+        onWheel={(event) => event.stopPropagation()}
+        onTouchStart={(event) => event.stopPropagation()}
+        onTouchMove={(event) => event.stopPropagation()}
+      >
+        <iframe key={zoom} src={pdfSource} title={`论文 ${paper.number} 完整 PDF`} />
+      </div>
       <aside className="paper-zoom" aria-label="PDF 缩放控制">
         <button type="button" onClick={() => setZoom(value => Math.min(180, value + 10))} aria-label="放大 PDF">＋</button>
         <output>{zoom}%</output>

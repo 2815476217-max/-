@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { HomeExperience } from "../components/HomeExperience";
+import { ProfileExperience } from "../components/ProfileExperience";
 
 export const metadata: Metadata = {
   title: "SITE TO LIFE — 冯驿岚 FYL",
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <HomeExperience />;
+  return <ProfileExperience />;
 }

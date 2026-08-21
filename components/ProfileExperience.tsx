@@ -96,7 +96,18 @@ export function ProfileExperience() {
   }, []);
 
   useEffect(() => {
-    const requestedPart = Number(new URLSearchParams(window.location.search).get("part"));
+    if (window.location.pathname === "/") {
+      window.history.scrollRestoration = "manual";
+      window.history.replaceState(window.history.state, "", "/");
+      setPart(0);
+      setIntroPage(0);
+      const frame = window.requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0, behavior: "instant" }));
+      return () => window.cancelAnimationFrame(frame);
+    }
+
+    const requested = new URLSearchParams(window.location.search).get("part");
+    if (requested === null) return;
+    const requestedPart = Number(requested);
     if (Number.isInteger(requestedPart) && requestedPart >= 0 && requestedPart < parts.length) {
       const frame = window.requestAnimationFrame(() => {
         setPart(requestedPart);
