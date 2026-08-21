@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 
 type PaperViewerProps = {
@@ -13,10 +13,12 @@ type PdfPageProps = {
   pageNumber: number;
   width: number;
   zoom: number;
+  renderQueue: MutableRefObject<Promise<void>>;
 };
 
-function PdfPage({ document, pageNumber, width, zoom }: PdfPageProps) {
+function PdfPage({ document, pageNumber, width, zoom, renderQueue }: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -24,7 +26,9 @@ function PdfPage({ document, pageNumber, width, zoom }: PdfPageProps) {
     let cancelled = false;
     let renderTask: { cancel: () => void; promise: Promise<unknown> } | null = null;
 
-    document.getPage(pageNumber).then((page) => {
+    const renderPage = async () => {
+      if (cancelled) return;
+      const page = await document.getPage(pageNumber);
       if (cancelled) return;
       const baseViewport = page.getViewport({ scale: 1 });
       const cssWidth = width * zoom / 100;
@@ -44,25 +48,40 @@ function PdfPage({ document, pageNumber, width, zoom }: PdfPageProps) {
         viewport,
         transform: pixelRatio === 1 ? undefined : [pixelRatio, 0, 0, pixelRatio, 0, 0],
       });
-      return renderTask.promise;
-    }).catch((error) => {
-      if (!cancelled && error?.name !== "RenderingCancelledException") console.error(error);
+      await renderTask.promise;
+      if (!cancelled) {
+        canvas.dataset.renderStatus = "complete";
+        setRenderError(null);
+      }
+    };
+
+    const queuedRender = renderQueue.current.then(renderPage);
+    renderQueue.current = queuedRender.catch(() => undefined);
+    queuedRender.catch((error) => {
+      if (!cancelled && error?.name !== "RenderingCancelledException") {
+        const message = error instanceof Error ? error.message : String(error);
+        canvas.dataset.renderStatus = "failed";
+        setRenderError(message);
+        console.error(`PDF page ${pageNumber} render failed:`, error);
+      }
     });
 
     return () => {
       cancelled = true;
       renderTask?.cancel();
     };
-  }, [document, pageNumber, width, zoom]);
+  }, [document, pageNumber, width, zoom, renderQueue]);
 
   return <figure className="paper-page" data-page-number={pageNumber} aria-label={`第 ${pageNumber} 页`}>
-    <canvas ref={canvasRef} />
+    <canvas key={`${width}-${zoom}`} ref={canvasRef} />
+    {renderError && <p className="paper-page-error">第 {pageNumber} 页加载失败<br /><small>{renderError}</small></p>}
     <figcaption>{String(pageNumber).padStart(2, "0")}</figcaption>
   </figure>;
 }
 
 export function PaperViewer({ paper }: PaperViewerProps) {
   const frameRef = useRef<HTMLDivElement>(null);
+  const renderQueue = useRef<Promise<void>>(Promise.resolve());
   const [zoom, setZoom] = useState(100);
   const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
   const [readerWidth, setReaderWidth] = useState(0);
@@ -80,16 +99,17 @@ export function PaperViewer({ paper }: PaperViewerProps) {
 
   useEffect(() => {
     let disposed = false;
-    let loadingTask: { promise: Promise<PDFDocumentProxy>; destroy: () => Promise<void> } | null = null;
+    let loadingTask: { promise: Promise<PDFDocumentProxy>; destroy?: () => Promise<void> } | null = null;
     let loadedDocument: PDFDocumentProxy | null = null;
 
     import("pdfjs-dist").then((pdfjs) => {
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+      pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.min.mjs";
       loadingTask = pdfjs.getDocument({
         url: paper.pdf,
         cMapUrl: "/pdfjs/cmaps/",
         cMapPacked: true,
         standardFontDataUrl: "/pdfjs/standard_fonts/",
+        wasmUrl: "/pdfjs/wasm/",
       });
       return loadingTask.promise;
     }).then((pdf) => {
@@ -104,8 +124,8 @@ export function PaperViewer({ paper }: PaperViewerProps) {
 
     return () => {
       disposed = true;
-      loadingTask?.destroy();
-      loadedDocument?.destroy();
+      loadingTask?.destroy?.();
+      loadedDocument?.destroy?.();
     };
   }, [paper.pdf]);
 
@@ -128,7 +148,7 @@ export function PaperViewer({ paper }: PaperViewerProps) {
         {!document && !error && <p className="paper-loading">论文加载中 / LOADING PAPER</p>}
         {error && <p className="paper-loading is-error">PDF 加载失败<br /><small>{error}</small></p>}
         {document && <div className="paper-pages" data-page-count={document.numPages}>
-          {Array.from({ length: document.numPages }, (_, index) => <PdfPage key={index + 1} document={document} pageNumber={index + 1} width={readerWidth} zoom={zoom} />)}
+          {Array.from({ length: document.numPages }, (_, index) => <PdfPage key={index + 1} document={document} pageNumber={index + 1} width={readerWidth} zoom={zoom} renderQueue={renderQueue} />)}
         </div>}
       </div>
       <aside className="paper-zoom" aria-label="PDF 缩放控制">
