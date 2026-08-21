@@ -19,7 +19,7 @@ const publications = [
   { number: "01", title: "Poverty, demand, and coping: A longitudinal investigation on the impact of public leisure facilities on the health of rural elderly.", journal: "PUBLIC HEALTH", meta: "SSCI · 中科院二区", status: "正式见刊", pdf: "/papers/01.pdf" },
   { number: "02", title: "The influence of urban community environment on fertility planning among women of childbearing age in Chinese megacities: an empirical study from Shanghai, China.", journal: "Journal of Housing and the Built Environment", meta: "SSCI · 中科院二区", status: "外审中", pdf: null },
   { number: "03", title: "Residential Facilities, Neighborhood Interaction, and Mental Health Among Rural Older Adults: Differential Effects of Indoor Residential and Community Public Facilities and Implications for Health Equity.", journal: "Journal of Public Health", meta: "SSCI · 中科院二区", status: "外审中", pdf: null },
-  { number: "04", title: "社交媒体平台异质性对青年“断情”现象的影响", journal: "《研究心理学进展》", meta: "中文学术论文", status: "正式见刊", pdf: "/papers/04.pdf" },
+  { number: "04", title: "社交媒体平台异质性对青年“断亲”现象的影响研究", journal: "《心理学进展》", meta: "中文学术论文", status: "正式见刊", pdf: "/papers/04.pdf" },
   { number: "05", title: "上海金山古桥的类型特征及其保护利用研究", journal: "《建筑与环境研究》", meta: "古桥保护与空间研究", status: "正式见刊", pdf: "/papers/05.pdf" },
 ] as const;
 
