@@ -14,15 +14,31 @@ type PdfPageProps = {
   width: number;
   zoom: number;
   renderQueue: MutableRefObject<Promise<void>>;
+  scrollRoot: MutableRefObject<HTMLDivElement | null>;
 };
 
-function PdfPage({ document, pageNumber, width, zoom, renderQueue }: PdfPageProps) {
+function PdfPage({ document, pageNumber, width, zoom, renderQueue, scrollRoot }: PdfPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const figureRef = useRef<HTMLElement>(null);
+  const [nearViewport, setNearViewport] = useState(pageNumber <= 2);
+  const [pageRatio, setPageRatio] = useState(1.414);
   const [renderError, setRenderError] = useState<string | null>(null);
 
   useEffect(() => {
+    const figure = figureRef.current;
+    const root = scrollRoot.current;
+    if (!figure || !root || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setNearViewport(entry.isIntersecting), {
+      root,
+      rootMargin: "120% 0px",
+    });
+    observer.observe(figure);
+    return () => observer.disconnect();
+  }, [scrollRoot]);
+
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || width <= 0) return;
+    if (!canvas || width <= 0 || !nearViewport) return;
     let cancelled = false;
     let renderTask: { cancel: () => void; promise: Promise<unknown> } | null = null;
 
@@ -31,10 +47,12 @@ function PdfPage({ document, pageNumber, width, zoom, renderQueue }: PdfPageProp
       const page = await document.getPage(pageNumber);
       if (cancelled) return;
       const baseViewport = page.getViewport({ scale: 1 });
+      setPageRatio(baseViewport.height / baseViewport.width);
       const cssWidth = width * zoom / 100;
       const pageScale = cssWidth / baseViewport.width;
       const viewport = page.getViewport({ scale: pageScale });
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      const mobile = window.matchMedia("(max-width: 760px)").matches;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, mobile ? 1.35 : 2);
       const context = canvas.getContext("2d", { alpha: false });
       if (!context) return;
 
@@ -69,10 +87,14 @@ function PdfPage({ document, pageNumber, width, zoom, renderQueue }: PdfPageProp
     return () => {
       cancelled = true;
       renderTask?.cancel();
+      canvas.width = 1;
+      canvas.height = 1;
+      canvas.removeAttribute("data-render-status");
     };
-  }, [document, pageNumber, width, zoom, renderQueue]);
+  }, [document, pageNumber, width, zoom, renderQueue, nearViewport]);
 
-  return <figure className="paper-page" data-page-number={pageNumber} aria-label={`第 ${pageNumber} 页`}>
+  const cssWidth = width * zoom / 100;
+  return <figure ref={figureRef} className="paper-page" data-page-number={pageNumber} aria-label={`第 ${pageNumber} 页`} style={{ width: cssWidth, minHeight: cssWidth * pageRatio }}>
     <canvas key={`${width}-${zoom}`} ref={canvasRef} />
     {renderError && <p className="paper-page-error">第 {pageNumber} 页加载失败<br /><small>{renderError}</small></p>}
     <figcaption>{String(pageNumber).padStart(2, "0")}</figcaption>
@@ -148,7 +170,7 @@ export function PaperViewer({ paper }: PaperViewerProps) {
         {!document && !error && <p className="paper-loading">论文加载中 / LOADING PAPER</p>}
         {error && <p className="paper-loading is-error">PDF 加载失败<br /><small>{error}</small></p>}
         {document && <div className="paper-pages" data-page-count={document.numPages}>
-          {Array.from({ length: document.numPages }, (_, index) => <PdfPage key={index + 1} document={document} pageNumber={index + 1} width={readerWidth} zoom={zoom} renderQueue={renderQueue} />)}
+          {Array.from({ length: document.numPages }, (_, index) => <PdfPage key={index + 1} document={document} pageNumber={index + 1} width={readerWidth} zoom={zoom} renderQueue={renderQueue} scrollRoot={frameRef} />)}
         </div>}
       </div>
       <aside className="paper-zoom" aria-label="PDF 缩放控制">

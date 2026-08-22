@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type DiagramViewerProps = {
   src: string;
@@ -14,11 +14,14 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
   const imageRef = useRef<HTMLImageElement>(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const liveScale = useRef(1);
+  const liveOffset = useRef({ x: 0, y: 0 });
+  const animationFrame = useRef<number | null>(null);
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; scale: number } | null>(null);
 
-  const clampOffset = (next: { x: number; y: number }, nextScale = scale) => {
+  const clampOffset = (next: { x: number; y: number }, nextScale = liveScale.current) => {
     const stage = stageRef.current;
     const image = imageRef.current;
     if (!stage || !image || nextScale <= 1) return { x: 0, y: 0 };
@@ -30,14 +33,31 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
     };
   };
 
-  const updateScale = (nextScale: number) => {
-    const value = Math.max(1, Math.min(4, nextScale));
-    setScale(value);
-    setOffset((current) => clampOffset(current, value));
+  const paintTransform = (nextScale: number, nextOffset: { x: number; y: number }) => {
+    liveScale.current = nextScale;
+    liveOffset.current = nextOffset;
+    if (animationFrame.current !== null) return;
+    animationFrame.current = window.requestAnimationFrame(() => {
+      animationFrame.current = null;
+      if (imageRef.current) imageRef.current.style.transform = `translate3d(${liveOffset.current.x}px, ${liveOffset.current.y}px, 0) scale(${liveScale.current})`;
+    });
   };
+
+  const updateScale = (nextScale: number, commit = true) => {
+    const value = Math.max(1, Math.min(4, nextScale));
+    const nextOffset = clampOffset(liveOffset.current, value);
+    paintTransform(value, nextOffset);
+    if (commit) { setScale(value); setOffset(nextOffset); }
+  };
+
+  useEffect(() => () => {
+    if (animationFrame.current !== null) window.cancelAnimationFrame(animationFrame.current);
+  }, []);
 
   const close = () => {
     dialogRef.current?.close();
+    liveScale.current = 1;
+    liveOffset.current = { x: 0, y: 0 };
     setScale(1);
     setOffset({ x: 0, y: 0 });
   };
@@ -77,7 +97,7 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
               drag.current = { x: event.clientX, y: event.clientY, ox: offset.x, oy: offset.y };
             } else if (pointers.current.size === 2) {
               const [first, second] = [...pointers.current.values()];
-              pinch.current = { distance: Math.hypot(second.x - first.x, second.y - first.y), scale };
+              pinch.current = { distance: Math.hypot(second.x - first.x, second.y - first.y), scale: liveScale.current };
               drag.current = null;
             }
           }}
@@ -87,11 +107,11 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
             if (pointers.current.size >= 2 && pinch.current) {
               const [first, second] = [...pointers.current.values()];
               const distance = Math.hypot(second.x - first.x, second.y - first.y);
-              updateScale(pinch.current.scale * distance / Math.max(1, pinch.current.distance));
+              updateScale(pinch.current.scale * distance / Math.max(1, pinch.current.distance), false);
               return;
             }
-            if (!drag.current || scale === 1) return;
-            setOffset(clampOffset({
+            if (!drag.current || liveScale.current === 1) return;
+            paintTransform(liveScale.current, clampOffset({
               x: drag.current.ox + event.clientX - drag.current.x,
               y: drag.current.oy + event.clientY - drag.current.y,
             }));
@@ -100,7 +120,9 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
             pointers.current.delete(event.pointerId);
             pinch.current = null;
             const remaining = [...pointers.current.values()][0];
-            drag.current = remaining ? { x: remaining.x, y: remaining.y, ox: offset.x, oy: offset.y } : null;
+            setScale(liveScale.current);
+            setOffset(liveOffset.current);
+            drag.current = remaining ? { x: remaining.x, y: remaining.y, ox: liveOffset.current.x, oy: liveOffset.current.y } : null;
           }}
           onPointerCancel={(event) => {
             pointers.current.delete(event.pointerId);
@@ -109,6 +131,8 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
           }}
           onDoubleClick={() => {
             const next = scale === 1 ? 2 : 1;
+            liveScale.current = next;
+            liveOffset.current = { x: 0, y: 0 };
             setScale(next);
             setOffset({ x: 0, y: 0 });
           }}
@@ -119,7 +143,7 @@ export function DiagramViewer({ src, alt, caption }: DiagramViewerProps) {
             alt={alt}
             loading="lazy"
             decoding="async"
-            style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})` }}
+            style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`, willChange: "transform" }}
             draggable={false}
           />
         </div>

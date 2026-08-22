@@ -39,6 +39,22 @@ const awards = [
 
 const activityPhotos = Array.from({ length: 53 }, (_, index) => `/media/profile/activities/activity-${String(index + 1).padStart(2, "0")}.webp`);
 
+function DeferredActivityImage({ src, alt, eager = false }: { src: string; alt: string; eager?: boolean }) {
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(eager);
+
+  useEffect(() => {
+    if (eager) return;
+    const image = imageRef.current;
+    if (!image || typeof IntersectionObserver === "undefined") { setShouldLoad(true); return; }
+    const observer = new IntersectionObserver(([entry]) => setShouldLoad(entry.isIntersecting), { rootMargin: "300px" });
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [eager]);
+
+  return <img ref={imageRef} src={shouldLoad ? src : undefined} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" />;
+}
+
 export function ProfileExperience() {
   const [part, setPart] = useState(0);
   const [direction, setDirection] = useState<"next" | "prev">("next");
@@ -48,7 +64,10 @@ export function ProfileExperience() {
   const [activeExperience, setActiveExperience] = useState<number | null>(null);
   const [paperNotice, setPaperNotice] = useState<string | null>(null);
   const [introPage, setIntroPage] = useState<0 | 1>(0);
+  const [experienceVisible, setExperienceVisible] = useState(true);
+  const [documentVisible, setDocumentVisible] = useState(true);
   const heroCanvas = useRef<HTMLCanvasElement>(null);
+  const experienceFlow = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const canvas = heroCanvas.current;
@@ -94,6 +113,20 @@ export function ProfileExperience() {
       context.putImageData(frame, 0, 0);
     };
   }, []);
+
+  useEffect(() => {
+    const updateVisibility = () => setDocumentVisible(!document.hidden);
+    document.addEventListener("visibilitychange", updateVisibility, { passive: true });
+    return () => document.removeEventListener("visibilitychange", updateVisibility);
+  }, []);
+
+  useEffect(() => {
+    const flow = experienceFlow.current;
+    if (part !== 3 || !flow || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => setExperienceVisible(entry.isIntersecting), { threshold: 0.05 });
+    observer.observe(flow);
+    return () => observer.disconnect();
+  }, [part]);
 
   useEffect(() => {
     if (window.location.pathname === "/") {
@@ -173,7 +206,7 @@ export function ProfileExperience() {
 
       {current.key === "awards" && <section className="awards-part" aria-labelledby="awards-title"><header className="bilingual-title"><h1 id="awards-title">竞赛获奖</h1><p>AWARDS & HONORS</p></header><div className="award-lines">{awards.map(([year,name,prize,level]) => <article key={name}><time>{year}</time><h2>{name}</h2><p>{prize}<small>{level}</small></p></article>)}</div><header className="certificate-heading"><h2>竞赛证书</h2><p>CERTIFICATE ARCHIVE</p></header><button className="certificate-composite" onClick={() => setActiveCertificate(0)} aria-label="放大查看完整竞赛证书合集"><img src="/media/profile/certificate-wall.jpg" alt="完整竞赛证书合集" loading="lazy" decoding="async" /><span>VIEW / 查看完整图片 ↗</span></button></section>}
 
-      {current.key === "experience" && <section className="experience-part flowing-experience" aria-labelledby="experience-title"><header className="bilingual-title"><h1 id="experience-title">个人活动经历</h1><p>EXPERIENCE ARCHIVE</p></header><div className={`experience-flow${activeExperience !== null ? " is-paused" : ""}`}><div className="activity-mosaic-track">{[0,1].map(copy => <div className="activity-mosaic-set" key={copy} aria-hidden={copy === 1 || undefined}>{activityPhotos.map((src,index) => <button className={`activity-flow-photo mosaic-size-${index % 10}`} key={`${copy}-${src}`} tabIndex={copy === 1 ? -1 : 0} onClick={() => setActiveExperience(index)} aria-label={`放大查看个人活动照片 ${index + 1}`}><img src={src} alt={copy === 0 ? `个人活动经历照片 ${index + 1}` : ""} loading={copy === 0 && index < 8 ? "eager" : "lazy"} decoding="async" /><span>查看 / VIEW</span></button>)}</div>)}</div></div></section>}
+      {current.key === "experience" && <section className="experience-part flowing-experience" aria-labelledby="experience-title"><header className="bilingual-title"><h1 id="experience-title">个人活动经历</h1><p>EXPERIENCE ARCHIVE</p></header><div ref={experienceFlow} className={`experience-flow${activeExperience !== null || !experienceVisible || !documentVisible ? " is-paused" : ""}`}><div className="activity-mosaic-track">{[0,1].map(copy => <div className="activity-mosaic-set" key={copy} aria-hidden={copy === 1 || undefined}>{activityPhotos.map((src,index) => <button className={`activity-flow-photo mosaic-size-${index % 10}`} key={`${copy}-${src}`} tabIndex={copy === 1 ? -1 : 0} onClick={() => setActiveExperience(index)} aria-label={`放大查看个人活动照片 ${index + 1}`}><DeferredActivityImage src={src} alt={copy === 0 ? `个人活动经历照片 ${index + 1}` : ""} eager={copy === 0 && index < 6} /><span>查看 / VIEW</span></button>)}</div>)}</div></div></section>}
 
       <footer className="part-controls">{part === 0 && introPage === 1 ? <button onClick={() => { setDirection("prev"); setIntroPage(0); }}>← 01-1 人物主视觉</button> : part > 0 ? <button onClick={() => goTo(part - 1)}>← {parts[part - 1].number} {parts[part - 1].zh}</button> : <span />}{part === 0 && introPage === 0 ? <button onClick={() => { setDirection("next"); setIntroPage(1); }}>01-2 / 工作证简介 →</button> : part < parts.length - 1 && <button onClick={() => goTo(part + 1)}>{parts[part + 1].number} / {parts[part + 1].zh} →</button>}</footer>
     </main>}
